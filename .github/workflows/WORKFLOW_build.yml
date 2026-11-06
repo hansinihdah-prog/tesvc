@@ -1,0 +1,38 @@
+name: Build VC Pitch Up (AIDL)
+
+on:
+  workflow_dispatch:
+    inputs:
+      aosp_tag:
+        description: "Tag AOSP Android 15 untuk sumber header"
+        required: false
+        default: "android-15.0.0_r1"
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build library dan modul
+        env:
+          AOSP_TAG: ${{ inputs.aosp_tag || 'android-15.0.0_r1' }}
+        run: |
+          set -o pipefail
+          bash build.sh 2>&1 | tee build.log
+
+      - name: Unggah hasil
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpitch-aidl
+          path: |
+            out/*.zip
+            out/*/undefined.txt
+            out/*/needed.txt
+            build.log
+          if-no-files-found: warn
