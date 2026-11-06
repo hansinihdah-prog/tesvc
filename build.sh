@@ -21,6 +21,7 @@ EFFECT_VER="${EFFECT_VER:-2}"   # android.hardware.audio.effect (vintf manifest 
 TYPES_VER="${TYPES_VER:-3}"     # android.media.audio.common.types (NEEDED di libpreprocessingaidl_mtk.so: V3)
 COMMON_VER="${COMMON_VER:-2}"   # android.hardware.common (NEEDED: V2)
 FMQ_VER="${FMQ_VER:-1}"         # android.hardware.common.fmq (NEEDED: V1)
+AUDCOMMON_VER="${AUDCOMMON_VER:-2}"  # android.hardware.audio.common (SinkMetadata/SourceMetadata, hanya header; bila tak ada dipakai versi tertinggi)
 API="${ANDROID_API:-35}"
 MODULE_VERSION="${MODULE_VERSION:-v2.0}"
 ABIS="${ABIS:-arm64 arm32}"
@@ -82,7 +83,13 @@ EFF_DIR="$(snap "$HI" android.hardware.audio.effect "$EFFECT_VER")"
 TYPES_DIR="$(snap "$SHI" android.media.audio.common.types "$TYPES_VER")"
 COMMON_DIR="$(snap "$HI" android.hardware.common "$COMMON_VER")"
 FMQ_DIR="$(snap "$HI" android.hardware.common.fmq "$FMQ_VER")"
-for v in EFF_DIR TYPES_DIR COMMON_DIR FMQ_DIR; do
+AUDCOMMON_DIR="$(snap "$HI" android.hardware.audio.common "$AUDCOMMON_VER")"
+if [ -z "$AUDCOMMON_DIR" ]; then
+    # versi yang diminta tidak ada di tag ini: pakai versi beku tertinggi
+    AUDCOMMON_DIR="$(find "$HI" -type d -regex '.*/aidl_api/android\.hardware\.audio\.common/[0-9]+' | sort -V | tail -n 1 || true)"
+fi
+[ -n "$AUDCOMMON_DIR" ] && AUDCOMMON_VER="$(basename "$AUDCOMMON_DIR")"
+for v in EFF_DIR TYPES_DIR COMMON_DIR FMQ_DIR AUDCOMMON_DIR; do
     [ -n "${!v}" ] && [ -d "${!v}" ] || die "snapshot AIDL $v tidak ditemukan di tag $AOSP_TAG (versi dibeku yang ada: $(ls "$HI/audio/aidl/aidl_api/android.hardware.audio.effect" 2>/dev/null | tr '\n' ' '))"
     log "$v = ${!v#$WORK/}"
 done
@@ -91,7 +98,7 @@ done
 GEN="$WORK/gen"
 rm -rf "$GEN"
 mkdir -p "$GEN/include" "$GEN/src"
-INC_AIDL=(-I "$EFF_DIR" -I "$TYPES_DIR" -I "$COMMON_DIR" -I "$FMQ_DIR")
+INC_AIDL=(-I "$EFF_DIR" -I "$TYPES_DIR" -I "$COMMON_DIR" -I "$FMQ_DIR" -I "$AUDCOMMON_DIR")
 
 gen_dir() { # gen_dir <dir-snapshot> <versi>
     local dir="$1" ver="$2" hash="" f
@@ -111,6 +118,7 @@ gen_dir "$EFF_DIR" "$EFFECT_VER"
 gen_dir "$TYPES_DIR" "$TYPES_VER"
 gen_dir "$COMMON_DIR" "$COMMON_VER"
 gen_dir "$FMQ_DIR" "$FMQ_VER"
+gen_dir "$AUDCOMMON_DIR" "$AUDCOMMON_VER"
 NH="$(find "$GEN/include" -name '*.h' | wc -l)"
 [ "$NH" -gt 0 ] || die "tidak ada header AIDL yang dihasilkan"
 log "$NH header AIDL dihasilkan"
